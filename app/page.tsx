@@ -1,21 +1,45 @@
-import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
-import { redirect } from 'next/navigation';
+'use client';
 
-export default async function Home() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+import { useState } from 'react';
+import { Loader2 } from 'lucide-react';
+import AavePositionsView from '@/components/AavePositionsView';
 
-  // If user is already logged in, redirect to dashboard
-  if (user) {
-    redirect('/dashboard');
-  }
+export default function Home() {
+  const [walletAddress, setWalletAddress] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [positionData, setPositionData] = useState(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setPositionData(null);
+
+    try {
+      const response = await fetch('/api/fetch-positions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch positions');
+      }
+
+      setPositionData(data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-background via-background to-background-card">
-      {/* Navigation */}
+      {/* Header */}
       <nav className="border-b border-white/10 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -23,111 +47,68 @@ export default async function Home() {
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-xl">
                 %
               </div>
-              <span className="text-xl font-bold">Aave PNL</span>
+              <span className="text-xl font-bold">Aave PNL Generator</span>
             </div>
-            <Link
-              href="/auth/login"
-              className="btn-primary"
-            >
-              Sign In
-            </Link>
           </div>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center">
-          <h1 className="text-6xl font-bold mb-6">
-            Track Your Aave{' '}
-            <span className="gradient-text">Performance</span>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Title */}
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold mb-4">
+            Track Your Aave <span className="gradient-text">Performance</span>
           </h1>
-          <p className="text-xl text-gray-400 mb-12 max-w-2xl mx-auto">
-            Generate beautiful PNL reports for your Aave positions on BSC.
-            Analyze your DeFi performance with real-time data and historical tracking.
+          <p className="text-gray-400">
+            Enter your BSC wallet address to view your Aave positions and generate PNL reports
           </p>
-          <div className="flex gap-4 justify-center">
-            <Link href="/auth/login" className="btn-primary text-lg">
-              Get Started →
-            </Link>
-            <a
-              href="#features"
-              className="px-8 py-3 border border-primary/30 rounded-lg hover:border-primary/60 transition-colors"
+        </div>
+
+        {/* Wallet Input */}
+        <div className="card p-8 mb-8">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/50 text-red-500 px-4 py-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="wallet" className="block text-sm font-medium mb-2">
+                BSC Wallet Address
+              </label>
+              <input
+                id="wallet"
+                type="text"
+                value={walletAddress}
+                onChange={(e) => setWalletAddress(e.target.value)}
+                placeholder="0x..."
+                required
+                disabled={loading}
+                className="w-full px-4 py-3 bg-background border border-white/10 rounded-lg focus:border-primary focus:outline-none transition-colors disabled:opacity-50"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              Learn More
-            </a>
-          </div>
+              {loading ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  Loading Positions...
+                </>
+              ) : (
+                'View Aave Positions'
+              )}
+            </button>
+          </form>
         </div>
 
-        {/* Features */}
-        <div id="features" className="grid md:grid-cols-3 gap-8 mt-32">
-          <div className="card p-8">
-            <div className="text-4xl mb-4">📊</div>
-            <h3 className="text-xl font-bold mb-2">Real-time Tracking</h3>
-            <p className="text-gray-400">
-              Automatically track all your Aave positions and calculate PNL in real-time.
-            </p>
-          </div>
-          <div className="card p-8">
-            <div className="text-4xl mb-4">💰</div>
-            <h3 className="text-xl font-bold mb-2">Accurate Calculations</h3>
-            <p className="text-gray-400">
-              Historical price tracking for precise initial position valuation and PNL.
-            </p>
-          </div>
-          <div className="card p-8">
-            <div className="text-4xl mb-4">🎨</div>
-            <h3 className="text-xl font-bold mb-2">Beautiful Reports</h3>
-            <p className="text-gray-400">
-              Generate shareable PNL cards with all your performance metrics.
-            </p>
-          </div>
-        </div>
-
-        {/* How it Works */}
-        <div className="mt-32">
-          <h2 className="text-4xl font-bold text-center mb-16">How It Works</h2>
-          <div className="grid md:grid-cols-4 gap-6">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4 text-primary font-bold">
-                1
-              </div>
-              <h4 className="font-semibold mb-2">Connect</h4>
-              <p className="text-sm text-gray-400">Sign in with your email</p>
-            </div>
-            <div className="text-center">
-              <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4 text-primary font-bold">
-                2
-              </div>
-              <h4 className="font-semibold mb-2">Enter Wallet</h4>
-              <p className="text-sm text-gray-400">Submit your BSC wallet address</p>
-            </div>
-            <div className="text-center">
-              <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4 text-primary font-bold">
-                3
-              </div>
-              <h4 className="font-semibold mb-2">Analyze</h4>
-              <p className="text-sm text-gray-400">We calculate your Aave PNL</p>
-            </div>
-            <div className="text-center">
-              <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4 text-primary font-bold">
-                4
-              </div>
-              <h4 className="font-semibold mb-2">View & Share</h4>
-              <p className="text-sm text-gray-400">Get your beautiful PNL report</p>
-            </div>
-          </div>
-        </div>
+        {/* Positions Display */}
+        {positionData && <AavePositionsView data={positionData} />}
       </div>
-
-      {/* Footer */}
-      <footer className="border-t border-white/10 mt-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center text-gray-400 text-sm">
-            <p>© 2024 Aave PNL Generator. Built for the DeFi community.</p>
-          </div>
-        </div>
-      </footer>
     </main>
   );
 }
