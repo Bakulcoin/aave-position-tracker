@@ -1,26 +1,48 @@
 # Aave PNL Generator for BSC
 
-Generate beautiful PNL (Profit and Loss) reports for your Aave positions on Binance Smart Chain.
+A full-stack web application to generate beautiful PNL (Profit and Loss) reports for your Aave positions on Binance Smart Chain.
 
 ![Aave PNL Generator](https://img.shields.io/badge/Aave-PNL%20Generator-00D4AA?style=for-the-badge&logo=aave&logoColor=white)
 
+## Tech Stack
+
+- **Frontend**: Next.js 14, React, TailwindCSS
+- **Backend**: Next.js API Routes
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth
+- **Deployment**: Vercel
+- **Blockchain Data**: BscScan API
+- **Price Data**: CoinGecko API
+
 ## Features
 
+- 🔐 **User Authentication** - Secure sign-up and login with Supabase
 - 📊 **Automatic Position Tracking** - Analyzes all your Aave transactions on BSC
 - 💰 **Real-time PNL Calculation** - Calculates profit/loss based on initial and current prices
 - 🎨 **Beautiful Card Generation** - Creates visual PNL cards as PNG images
+- 📱 **Responsive Dashboard** - View all your historical reports
+- 💾 **Report History** - All reports saved to your account
 - 🔍 **Detailed Breakdown** - Shows supplied and borrowed positions with full metrics
-- 🚀 **Easy to Use** - Simple CLI interface, just provide your wallet address
 
 ## How It Works
 
-1. **User submits wallet address** via CLI
-2. **System fetches Aave transactions** from BscScan API
-3. **Analyzes initial positions** - Tracks when you supplied/borrowed tokens and at what price
-4. **Analyzes current positions** - Gets current token prices and position values
-5. **Generates PNL card** - Creates a beautiful visual report with all metrics
+1. **User signs up/logs in** via Supabase authentication
+2. **User submits wallet address** through the web dashboard
+3. **System fetches Aave transactions** from BscScan API
+4. **Analyzes initial positions** - Tracks when you supplied/borrowed tokens and at what price
+5. **Analyzes current positions** - Gets current token prices and position values
+6. **Generates PNL card** - Creates a beautiful visual report with all metrics
+7. **Stores in database** - Report saved to Supabase for future reference
 
-## Installation
+## Quick Start
+
+### Prerequisites
+
+- Node.js 18+ installed
+- A Supabase account (free tier works)
+- BscScan API key (optional but recommended)
+
+### Installation
 
 ```bash
 # Clone the repository
@@ -29,43 +51,66 @@ cd aave-pnl-generator
 
 # Install dependencies
 npm install
-
-# Build the project
-npm run build
 ```
 
-## Configuration
+### Configuration
 
-1. Copy the example environment file:
+1. **Set up Supabase**:
+   - Create a new project at [supabase.com](https://supabase.com)
+   - Go to Project Settings > API to get your keys
+   - Run the SQL migration from `supabase/migrations/001_initial_schema.sql` in the SQL Editor
+
+2. **Configure Environment Variables**:
 ```bash
-cp .env.example .env
+cp .env.local.example .env.local
 ```
 
-2. (Optional but recommended) Add your BscScan API key to `.env`:
+Edit `.env.local` with your credentials:
+```env
+# BscScan API Key (Get from https://bscscan.com/apis)
+BSCSCAN_API_KEY=your_bscscan_api_key
+
+# Supabase (Get from https://supabase.com/dashboard/project/_/settings/api)
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# App URL
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
-BSCSCAN_API_KEY=your_api_key_here
+
+3. **Run the development server**:
+```bash
+npm run dev
 ```
 
-Get a free API key at: https://bscscan.com/apis
+Visit [http://localhost:3000](http://localhost:3000) to see the app!
 
-## Usage
+## Deployment on Vercel
 
-### Basic Usage
+1. **Push to GitHub**: Push your code to a GitHub repository
+
+2. **Import to Vercel**:
+   - Go to [vercel.com](https://vercel.com)
+   - Click "New Project"
+   - Import your GitHub repository
+
+3. **Configure Environment Variables**:
+   - Add all environment variables from `.env.local`
+   - Make sure to add them in the Vercel dashboard
+
+4. **Deploy**: Click "Deploy" and your app will be live!
+
+## CLI Usage (Optional)
+
+You can also use the CLI for quick PNL generation:
 
 ```bash
-npm run generate 0xYourWalletAddress
-```
+# Generate a PNL report
+npm run generate-cli 0xYourWalletAddress
 
-### With Custom Output Path
-
-```bash
-npm run generate 0xYourWalletAddress --output my-custom-pnl.png
-```
-
-### Development Mode
-
-```bash
-npm run dev 0xYourWalletAddress
+# With custom output path
+npm run generate-cli 0xYourWalletAddress --output my-pnl.png
 ```
 
 ## Output
@@ -122,32 +167,70 @@ Currently supports these tokens on BSC:
 ## Architecture
 
 ```
-src/
-├── config/
-│   └── aave.ts                 # Aave contract addresses and configurations
-├── services/
-│   ├── bscscan.service.ts      # Fetches blockchain data via BscScan API
-│   ├── aave-parser.service.ts  # Parses Aave transactions
-│   ├── price.service.ts        # Fetches token prices (CoinGecko)
-│   ├── pnl-calculator.service.ts # Calculates PNL metrics
-│   ├── image-generator.service.ts # Generates PNL card images
-│   └── aave-pnl.service.ts     # Main orchestration service
-├── types/
-│   └── index.ts                # TypeScript type definitions
-└── index.ts                    # CLI entry point
+aave-pnl-generator/
+├── app/                        # Next.js App Router
+│   ├── api/                    # API Routes
+│   │   ├── generate-pnl/       # PNL generation endpoint
+│   │   └── reports/            # Reports fetching endpoint
+│   ├── auth/                   # Authentication pages
+│   │   ├── login/              # Login/signup page
+│   │   └── callback/           # Auth callback handler
+│   ├── dashboard/              # Dashboard page
+│   ├── layout.tsx              # Root layout
+│   ├── page.tsx                # Landing page
+│   └── globals.css             # Global styles
+├── components/                 # React components
+│   └── DashboardClient.tsx     # Dashboard client component
+├── lib/                        # Core business logic
+│   ├── config/
+│   │   └── aave.ts             # Aave contract addresses
+│   ├── services/
+│   │   ├── bscscan.service.ts  # Blockchain data fetching
+│   │   ├── aave-parser.service.ts # Transaction parsing
+│   │   ├── price.service.ts    # Price data fetching
+│   │   ├── pnl-calculator.service.ts # PNL calculation
+│   │   ├── image-generator.service.ts # Card generation
+│   │   └── aave-pnl.service.ts # Main orchestrator
+│   ├── supabase/               # Supabase client configs
+│   │   ├── client.ts           # Browser client
+│   │   ├── server.ts           # Server client
+│   │   └── middleware.ts       # Auth middleware
+│   └── types/
+│       └── index.ts            # TypeScript definitions
+├── supabase/
+│   └── migrations/             # Database migrations
+│       └── 001_initial_schema.sql
+├── cli/                        # CLI tool (optional)
+│   └── index.ts
+└── public/                     # Static assets
+    └── pnl-cards/              # Generated PNL cards
 ```
+
+## Database Schema
+
+The application uses the following main tables:
+
+- **profiles**: User profiles (extends Supabase auth.users)
+- **pnl_reports**: Stores generated PNL reports
+- **positions**: Detailed position data for each report
+- **user_wallets**: Associates wallet addresses with users
+
+All tables have Row Level Security (RLS) enabled for data protection.
 
 ## Data Sources
 
 - **Blockchain Data**: BscScan API
 - **Price Data**: CoinGecko API (free tier)
 - **Historical Prices**: CoinGecko historical data
+- **Database**: Supabase PostgreSQL
+- **Authentication**: Supabase Auth
 
 ## Limitations
 
 - Only tracks Aave V3 positions on BSC
 - Historical price data may have delays due to API rate limits
 - Free tier API limits apply (BscScan: 5 calls/sec, CoinGecko: 10-50 calls/min)
+- Supports USDT, USDC, WBNB, BTCB, and ETH tokens
 
 ## Troubleshooting
 
@@ -169,15 +252,28 @@ src/
 # Install dependencies
 npm install
 
-# Run in development mode
-npm run dev 0xYourAddress
+# Run development server
+npm run dev
 
 # Build for production
 npm run build
 
-# Run built version
-npm start 0xYourAddress
+# Run production build locally
+npm start
+
+# Run CLI tool
+npm run generate-cli 0xYourAddress
 ```
+
+## Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `BSCSCAN_API_KEY` | BscScan API key for fetching transactions | Recommended |
+| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL | Yes |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key | Yes |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key | Yes |
+| `NEXT_PUBLIC_APP_URL` | Application URL | Yes |
 
 ## Contributing
 
@@ -194,8 +290,13 @@ This tool is for informational purposes only. Always verify PNL calculations ind
 ## Credits
 
 Built with:
+- [Next.js](https://nextjs.org/) - React framework
+- [Supabase](https://supabase.com/) - Backend as a Service
+- [Vercel](https://vercel.com/) - Deployment platform
+- [TailwindCSS](https://tailwindcss.com/) - CSS framework
 - [ethers.js](https://docs.ethers.org/) - Ethereum library
-- [node-canvas](https://github.com/Automattic/node-canvas) - Canvas implementation for Node.js
+- [node-canvas](https://github.com/Automattic/node-canvas) - Canvas implementation
 - [axios](https://axios-http.com/) - HTTP client
 - [BscScan API](https://bscscan.com/apis) - Blockchain data
 - [CoinGecko API](https://www.coingecko.com/en/api) - Price data
+- [Lucide React](https://lucide.dev/) - Icon library
