@@ -1,1 +1,25 @@
-# Aave PNL Generator - Full Stack Web App
+# Dependencies
+node_modules/
+
+# CLI tools (not needed for web deployment)
+cli/
+
+# Local output directories
+output/
+
+# Development files
+.env.local
+.env*.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

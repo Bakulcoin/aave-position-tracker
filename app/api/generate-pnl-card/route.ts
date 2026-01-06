@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AavePnLService } from '@/lib/services/aave-pnl.service';
-import { join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,34 +21,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`Generating PNL card for wallet: ${walletAddress}`);
+    console.log(`Generating PNL card data for wallet: ${walletAddress}`);
 
     // Initialize PNL service
     const aavePnLService = new AavePnLService(process.env.BSCSCAN_API_KEY);
 
-    // Generate output path
-    const outputDir = join(process.cwd(), 'public', 'pnl-cards');
-    const outputFileName = `${walletAddress.slice(0, 10)}-${Date.now()}.png`;
-    const outputPath = join(outputDir, outputFileName);
+    // Generate PNL report (data only, no image on Vercel)
+    const pnlCard = await aavePnLService.generatePnLReport(walletAddress);
 
-    // Ensure output directory exists
-    if (!existsSync(outputDir)) {
-      mkdirSync(outputDir, { recursive: true });
-    }
-
-    // Generate PNL report with image
-    const pnlCard = await aavePnLService.generatePnLReport(
-      walletAddress,
-      outputPath
-    );
-
-    const imageUrl = `/pnl-cards/${outputFileName}`;
-
-    // Return success response
+    // Return data for client-side image generation
     return NextResponse.json({
       success: true,
-      imageUrl,
-      message: 'PNL card generated successfully',
+      walletAddress,
+      positions: {
+        supplied: pnlCard.position.supplied,
+        borrowed: pnlCard.position.borrowed,
+      },
+      summary: {
+        totalSupplied: pnlCard.position.supplied.reduce((sum, p) => sum + p.currentValue, 0),
+        totalBorrowed: pnlCard.position.borrowed.reduce((sum, p) => sum + p.currentValue, 0),
+        netWorth: pnlCard.position.currentNetWorth,
+      },
+      timestamp: pnlCard.timestamp,
+      message: 'PNL data generated successfully',
     });
   } catch (error: any) {
     console.error('Error generating PNL card:', error);
