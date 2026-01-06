@@ -2,12 +2,14 @@
 const nextConfig = {
   images: {
     domains: ['localhost'],
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**.supabase.co',
-      },
-    ],
+  },
+  webpack: (config) => {
+    // Exclude 'canvas' from webpack bundling - it's only used for CLI image generation
+    config.externals = config.externals || [];
+    config.externals.push({
+      canvas: 'canvas',
+    });
+    return config;
   },
 };
 

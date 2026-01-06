@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { TokenPrice } from '../types/index.js';
+import { TokenPrice } from '../types';
 
 export class PriceService {
   private coingeckoBaseUrl = 'https://api.coingecko.com/api/v3';
@@ -8,18 +8,43 @@ export class PriceService {
 
   // Token address to CoinGecko ID mapping for BSC
   private tokenIdMap: Record<string, string> = {
-    '0x55d398326f99059fF775485246999027B3197955': 'tether', // USDT
-    '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d': 'usd-coin', // USDC
-    '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c': 'wbnb', // WBNB
-    '0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c': 'bitcoin-bep2', // BTCB
-    '0x2170Ed0880ac9A755fd29B2688956BD959F933F8': 'ethereum', // ETH
+    '0x55d398326f99059ff775485246999027b3197955': 'tether', // USDT
+    '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d': 'usd-coin', // USDC
+    '0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c': 'wbnb', // WBNB
+    '0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c': 'bitcoin-bep2', // BTCB
+    '0x2170ed0880ac9a755fd29b2688956bd959f933f8': 'ethereum', // ETH
+  };
+
+  // Symbol to CoinGecko ID mapping
+  private symbolIdMap: Record<string, string> = {
+    'USDT': 'tether',
+    'USDC': 'usd-coin',
+    'WBNB': 'wbnb',
+    'BTCB': 'bitcoin-bep2',
+    'ETH': 'ethereum',
+    'BNB': 'wbnb',
+    'FDUSD': 'first-digital-usd',
+    'CAKE': 'pancakeswap-token',
+    'wstETH': 'wrapped-steth',
   };
 
   /**
-   * Get current price for a token
+   * Get CoinGecko ID from address or symbol
    */
-  async getCurrentPrice(tokenAddress: string): Promise<number> {
-    const cacheKey = `${tokenAddress}-current`;
+  private getCoinGeckoId(addressOrSymbol: string): string | undefined {
+    // Check if it's a symbol first
+    if (this.symbolIdMap[addressOrSymbol.toUpperCase()]) {
+      return this.symbolIdMap[addressOrSymbol.toUpperCase()];
+    }
+    // Otherwise treat as address
+    return this.tokenIdMap[addressOrSymbol.toLowerCase()];
+  }
+
+  /**
+   * Get current price for a token (accepts address or symbol)
+   */
+  async getCurrentPrice(addressOrSymbol: string): Promise<number> {
+    const cacheKey = `${addressOrSymbol}-current`;
     const cached = this.priceCache.get(cacheKey);
 
     if (cached && Date.now() - cached.timestamp < this.cacheDuration) {
@@ -27,10 +52,10 @@ export class PriceService {
     }
 
     try {
-      const coingeckoId = this.tokenIdMap[tokenAddress.toLowerCase()];
+      const coingeckoId = this.getCoinGeckoId(addressOrSymbol);
 
       if (!coingeckoId) {
-        console.warn(`No CoinGecko ID found for token ${tokenAddress}, defaulting to $1`);
+        console.warn(`No CoinGecko ID found for token ${addressOrSymbol}, defaulting to $1`);
         return 1;
       }
 
@@ -47,20 +72,20 @@ export class PriceService {
 
       return price;
     } catch (error) {
-      console.error(`Error fetching current price for ${tokenAddress}:`, error);
+      console.error(`Error fetching current price for ${addressOrSymbol}:`, error);
       return 0;
     }
   }
 
   /**
-   * Get historical price for a token at a specific timestamp
+   * Get historical price for a token at a specific timestamp (accepts address or symbol)
    */
-  async getHistoricalPrice(tokenAddress: string, timestamp: number): Promise<number> {
+  async getHistoricalPrice(addressOrSymbol: string, timestamp: number): Promise<number> {
     try {
-      const coingeckoId = this.tokenIdMap[tokenAddress.toLowerCase()];
+      const coingeckoId = this.getCoinGeckoId(addressOrSymbol);
 
       if (!coingeckoId) {
-        console.warn(`No CoinGecko ID found for token ${tokenAddress}, defaulting to $1`);
+        console.warn(`No CoinGecko ID found for token ${addressOrSymbol}, defaulting to $1`);
         return 1;
       }
 
@@ -89,9 +114,9 @@ export class PriceService {
     } catch (error: any) {
       if (error.response?.status === 429) {
         console.warn('Rate limited by CoinGecko, using current price as fallback');
-        return this.getCurrentPrice(tokenAddress);
+        return this.getCurrentPrice(addressOrSymbol);
       }
-      console.error(`Error fetching historical price for ${tokenAddress}:`, error);
+      console.error(`Error fetching historical price for ${addressOrSymbol}:`, error);
       return 0;
     }
   }

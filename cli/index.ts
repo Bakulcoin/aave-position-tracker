@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { config } from 'dotenv';
-import { AavePnLService } from '../lib/services/aave-pnl.service.js';
+import { AavePnLService } from '../lib/services/aave-pnl.service';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 

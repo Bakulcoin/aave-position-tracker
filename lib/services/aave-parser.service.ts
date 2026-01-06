@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
-import { AaveTransaction, AaveEvent } from '../types/index.js';
-import { AAVE_CONTRACTS, AAVE_METHOD_SIGNATURES, AAVE_TOKENS } from '../config/aave.js';
+import { AaveTransaction, AaveEvent } from '../types';
+import { AAVE_CONTRACTS, AAVE_METHOD_SIGNATURES, AAVE_TOKENS } from '../config/aave';
 
 export class AaveParserService {
   /**

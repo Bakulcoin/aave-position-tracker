@@ -1,6 +1,6 @@
-import { AaveEvent, AavePosition, TokenPosition } from '../types/index.js';
-import { PriceService } from './price.service.js';
-import { AAVE_TOKENS } from '../config/aave.js';
+import { AaveEvent, AavePosition, TokenPosition } from '../types';
+import { PriceService } from './price.service';
+import { AAVE_TOKENS } from '../config/aave';
 
 export class PnLCalculatorService {
   private priceService: PriceService;
@@ -147,5 +147,37 @@ export class PnLCalculatorService {
 
     // Use the amount from the first event as initial amount
     return sortedEvents[0].amount;
+  }
+
+  /**
+   * Calculate historical values for current aToken balances using transaction history
+   */
+  async calculateHistoricalValues(
+    events: AaveEvent[],
+    currentBalances: Map<string, { symbol: string; balance: number; decimals: number }>
+  ): Promise<{
+    initialNetWorth: number;
+    positions: Map<string, { initialPrice: number; initialValue: number }>;
+  }> {
+    const positions = new Map<string, { initialPrice: number; initialValue: number }>();
+    let initialNetWorth = 0;
+
+    for (const [symbol, balanceData] of currentBalances) {
+      const tokenAddress = this.getTokenAddress(symbol);
+      if (!tokenAddress) continue;
+
+      // Find the first supply event for this token
+      const firstSupplyEvent = this.getFirstEventForToken(events, tokenAddress, ['supply']);
+
+      if (firstSupplyEvent) {
+        const initialPrice = await this.priceService.getHistoricalPrice(symbol, firstSupplyEvent.timestamp);
+        const initialValue = balanceData.balance * initialPrice;
+
+        positions.set(symbol, { initialPrice, initialValue });
+        initialNetWorth += initialValue;
+      }
+    }
+
+    return { initialNetWorth, positions };
   }
 }
