@@ -1,6 +1,6 @@
 # Aave PNL Generator for BSC
 
-A full-stack web application to generate beautiful PNL (Profit and Loss) reports for your Aave positions on Binance Smart Chain.
+A web application to generate beautiful PNL (Profit and Loss) reports for your Aave positions on Binance Smart Chain, with Discord bot integration for sharing.
 
 ![Aave PNL Generator](https://img.shields.io/badge/Aave-PNL%20Generator-00D4AA?style=for-the-badge&logo=aave&logoColor=white)
 
@@ -8,39 +8,36 @@ A full-stack web application to generate beautiful PNL (Profit and Loss) reports
 
 - **Frontend**: Next.js 14, React, TailwindCSS
 - **Backend**: Next.js API Routes
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: Supabase Auth
 - **Deployment**: Vercel
 - **Blockchain Data**: BscScan API
 - **Price Data**: CoinGecko API
+- **Sharing**: Discord Bot (discord.js)
 
 ## Features
 
-- 🔐 **User Authentication** - Secure sign-up and login with Supabase
 - 📊 **Automatic Position Tracking** - Analyzes all your Aave transactions on BSC
 - 💰 **Real-time PNL Calculation** - Calculates profit/loss based on initial and current prices
 - 🎨 **Beautiful Card Generation** - Creates visual PNL cards as PNG images
-- 📱 **Responsive Dashboard** - View all your historical reports
-- 💾 **Report History** - All reports saved to your account
+- 🤖 **Discord Bot Integration** - Share your PNL cards directly to Discord channels via bot
 - 🔍 **Detailed Breakdown** - Shows supplied and borrowed positions with full metrics
+- 📥 **Download Cards** - Save PNL cards as PNG images
 
 ## How It Works
 
-1. **User signs up/logs in** via Supabase authentication
-2. **User submits wallet address** through the web dashboard
-3. **System fetches Aave transactions** from BscScan API
-4. **Analyzes initial positions** - Tracks when you supplied/borrowed tokens and at what price
-5. **Analyzes current positions** - Gets current token prices and position values
-6. **Generates PNL card** - Creates a beautiful visual report with all metrics
-7. **Stores in database** - Report saved to Supabase for future reference
+1. **User submits wallet address** through the web interface
+2. **System fetches Aave transactions** from BscScan API
+3. **Analyzes initial positions** - Tracks when you supplied/borrowed tokens and at what price
+4. **Analyzes current positions** - Gets current token prices and position values
+5. **Generates PNL card** - Creates a beautiful visual report with all metrics
+6. **Share to Discord** - Send your PNL card to any Discord channel via bot
 
 ## Quick Start
 
 ### Prerequisites
 
 - Node.js 18+ installed
-- A Supabase account (free tier works)
 - BscScan API key (optional but recommended)
+- Discord Bot Token and Channel ID (for sharing feature)
 
 ### Installation
 
@@ -55,14 +52,9 @@ npm install
 
 ### Configuration
 
-1. **Set up Supabase**:
-   - Create a new project at [supabase.com](https://supabase.com)
-   - Go to Project Settings > API to get your keys
-   - Run the SQL migration from `supabase/migrations/001_initial_schema.sql` in the SQL Editor
-
-2. **Configure Environment Variables**:
+1. **Configure Environment Variables**:
 ```bash
-cp .env.local.example .env.local
+cp .env.example.example .env.local
 ```
 
 Edit `.env.local` with your credentials:
@@ -70,14 +62,24 @@ Edit `.env.local` with your credentials:
 # BscScan API Key (Get from https://bscscan.com/apis)
 BSCSCAN_API_KEY=your_bscscan_api_key
 
-# Supabase (Get from https://supabase.com/dashboard/project/_/settings/api)
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+# Discord Bot Configuration
+DISCORD_BOT_TOKEN=your_discord_bot_token
+DISCORD_CHANNEL_ID=your_discord_channel_id
 
 # App URL
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
+
+2. **Set up Discord Bot** (optional, for sharing):
+   - Go to [Discord Developer Portal](https://discord.com/developers/applications)
+   - Create a new application
+   - Go to "Bot" section and create a bot
+   - Copy the Bot Token
+   - Enable "Message Content Intent" if needed
+   - Go to OAuth2 > URL Generator
+   - Select "bot" scope and "Send Messages", "Attach Files" permissions
+   - Use the generated URL to invite the bot to your server
+   - Copy the Channel ID where you want the bot to post (Right-click channel > Copy ID)
 
 3. **Run the development server**:
 ```bash
@@ -119,6 +121,7 @@ The tool generates:
 
 1. **Console Output** - Detailed PNL breakdown in your terminal
 2. **PNG Image** - Visual PNL card saved to `./output/pnl-card.png` (or custom path)
+3. **Discord Message** - Share your PNL card to Discord (optional)
 
 ### Sample Output
 
@@ -170,17 +173,14 @@ Currently supports these tokens on BSC:
 aave-pnl-generator/
 ├── app/                        # Next.js App Router
 │   ├── api/                    # API Routes
-│   │   ├── generate-pnl/       # PNL generation endpoint
-│   │   └── reports/            # Reports fetching endpoint
-│   ├── auth/                   # Authentication pages
-│   │   ├── login/              # Login/signup page
-│   │   └── callback/           # Auth callback handler
-│   ├── dashboard/              # Dashboard page
+│   │   ├── fetch-positions/    # Position fetching endpoint
+│   │   ├── generate-pnl-card/  # PNL card generation endpoint
+│   │   └── share-discord/      # Discord bot sharing endpoint
 │   ├── layout.tsx              # Root layout
 │   ├── page.tsx                # Landing page
 │   └── globals.css             # Global styles
 ├── components/                 # React components
-│   └── DashboardClient.tsx     # Dashboard client component
+│   └── AavePositionsView.tsx   # Positions display component
 ├── lib/                        # Core business logic
 │   ├── config/
 │   │   └── aave.ts             # Aave contract addresses
@@ -190,40 +190,39 @@ aave-pnl-generator/
 │   │   ├── price.service.ts    # Price data fetching
 │   │   ├── pnl-calculator.service.ts # PNL calculation
 │   │   ├── image-generator.service.ts # Card generation
+│   │   ├── discord.service.ts  # Discord bot integration
 │   │   └── aave-pnl.service.ts # Main orchestrator
-│   ├── supabase/               # Supabase client configs
-│   │   ├── client.ts           # Browser client
-│   │   ├── server.ts           # Server client
-│   │   └── middleware.ts       # Auth middleware
 │   └── types/
 │       └── index.ts            # TypeScript definitions
-├── supabase/
-│   └── migrations/             # Database migrations
-│       └── 001_initial_schema.sql
 ├── cli/                        # CLI tool (optional)
 │   └── index.ts
 └── public/                     # Static assets
-    └── pnl-cards/              # Generated PNL cards
 ```
 
-## Database Schema
+## Discord Bot Integration
 
-The application uses the following main tables:
+The app uses a Discord bot to share PNL cards:
 
-- **profiles**: User profiles (extends Supabase auth.users)
-- **pnl_reports**: Stores generated PNL reports
-- **positions**: Detailed position data for each report
-- **user_wallets**: Associates wallet addresses with users
+1. **Create Bot**: Set up a bot in the Discord Developer Portal
+2. **Configure**: Add bot token and channel ID to environment variables
+3. **Invite Bot**: Use OAuth2 URL to add the bot to your server
+4. **Share**: Click "Share to Discord" button after generating a report
 
-All tables have Row Level Security (RLS) enabled for data protection.
+The Discord message includes:
+- An embedded card with PNL summary (color-coded: green for profit, red for loss)
+- The PNL card image as an attachment
+- Wallet address and timestamp
+
+### Required Bot Permissions
+- Send Messages
+- Attach Files
+- Embed Links
 
 ## Data Sources
 
 - **Blockchain Data**: BscScan API
 - **Price Data**: CoinGecko API (free tier)
 - **Historical Prices**: CoinGecko historical data
-- **Database**: Supabase PostgreSQL
-- **Authentication**: Supabase Auth
 
 ## Limitations
 
@@ -245,6 +244,13 @@ All tables have Row Level Security (RLS) enabled for data protection.
 ### "Invalid wallet address"
 - Ensure the address starts with `0x` and is 42 characters long
 - Addresses are case-insensitive
+
+### Discord bot not working
+- Verify your bot token is correct
+- Check that the channel ID is valid
+- Ensure the bot has been invited to the server
+- Verify the bot has "Send Messages" and "Attach Files" permissions in the channel
+- Check server logs for connection errors
 
 ## Development
 
@@ -270,9 +276,8 @@ npm run generate-cli 0xYourAddress
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `BSCSCAN_API_KEY` | BscScan API key for fetching transactions | Recommended |
-| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL | Yes |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key | Yes |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key | Yes |
+| `DISCORD_BOT_TOKEN` | Discord bot token for sharing | Optional |
+| `DISCORD_CHANNEL_ID` | Discord channel ID where bot posts | Optional |
 | `NEXT_PUBLIC_APP_URL` | Application URL | Yes |
 
 ## Contributing
@@ -291,11 +296,10 @@ This tool is for informational purposes only. Always verify PNL calculations ind
 
 Built with:
 - [Next.js](https://nextjs.org/) - React framework
-- [Supabase](https://supabase.com/) - Backend as a Service
 - [Vercel](https://vercel.com/) - Deployment platform
 - [TailwindCSS](https://tailwindcss.com/) - CSS framework
 - [ethers.js](https://docs.ethers.org/) - Ethereum library
-- [node-canvas](https://github.com/Automattic/node-canvas) - Canvas implementation
+- [discord.js](https://discord.js.org/) - Discord bot library
 - [axios](https://axios-http.com/) - HTTP client
 - [BscScan API](https://bscscan.com/apis) - Blockchain data
 - [CoinGecko API](https://www.coingecko.com/en/api) - Price data

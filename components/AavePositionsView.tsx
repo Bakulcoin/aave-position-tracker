@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { Download, Loader2 } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Download, Loader2, MessageCircle, Check } from 'lucide-react';
 
 interface Position {
   symbol: string;
@@ -26,7 +26,10 @@ interface PositionData {
 
 export default function AavePositionsView({ data }: { data: PositionData }) {
   const [generating, setGenerating] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [shared, setShared] = useState(false);
   const [error, setError] = useState('');
+  const [discordConfigured, setDiscordConfigured] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const totalSupplied = data.positions.supplied.reduce(
@@ -41,6 +44,34 @@ export default function AavePositionsView({ data }: { data: PositionData }) {
 
   const healthFactor = totalBorrowed > 0 ? (totalSupplied / totalBorrowed) * 100 : Infinity;
 
+  // Check if Discord is configured on mount
+  useEffect(() => {
+    const checkDiscord = async () => {
+      try {
+        const response = await fetch('/api/share-discord');
+        const result = await response.json();
+        setDiscordConfigured(result.configured);
+      } catch {
+        setDiscordConfigured(false);
+      }
+    };
+    checkDiscord();
+  }, []);
+
+  const generateCardImage = async (): Promise<string | null> => {
+    if (!cardRef.current) return null;
+
+    const html2canvas = (await import('html2canvas')).default;
+    const canvas = await html2canvas(cardRef.current, {
+      backgroundColor: '#0d1117',
+      scale: 2,
+      logging: false,
+      useCORS: true,
+    });
+
+    return canvas.toDataURL('image/png');
+  };
+
   const handleGeneratePNL = async () => {
     if (!cardRef.current) return;
 
@@ -48,33 +79,60 @@ export default function AavePositionsView({ data }: { data: PositionData }) {
     setError('');
 
     try {
-      // Dynamically import html2canvas
-      const html2canvas = (await import('html2canvas')).default;
-
-      // Generate image from the card
-      const canvas = await html2canvas(cardRef.current, {
-        backgroundColor: '#0d1117',
-        scale: 2,
-        logging: false,
-        useCORS: true,
-      });
-
-      // Convert to blob and download
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `aave-pnl-${data.walletAddress.slice(0, 8)}.png`;
-          link.click();
-          URL.revokeObjectURL(url);
-        }
-      }, 'image/png');
-
+      const dataUrl = await generateCardImage();
+      if (dataUrl) {
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = `aave-pnl-${data.walletAddress.slice(0, 8)}.png`;
+        link.click();
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to generate image');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleShareToDiscord = async () => {
+    if (!cardRef.current) return;
+
+    setSharing(true);
+    setError('');
+    setShared(false);
+
+    try {
+      // Generate image
+      const imageBase64 = await generateCardImage();
+
+      // Send to API
+      const response = await fetch('/api/share-discord', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          walletAddress: data.walletAddress,
+          currentNetWorth: data.summary.currentNetWorth,
+          totalPnL: data.summary.totalPnL,
+          pnlPercentage: data.summary.pnlPercentage,
+          suppliedTotal: totalSupplied,
+          borrowedTotal: totalBorrowed,
+          imageBase64,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to share to Discord');
+      }
+
+      setShared(true);
+      setTimeout(() => setShared(false), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to share to Discord');
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -221,7 +279,7 @@ export default function AavePositionsView({ data }: { data: PositionData }) {
         </div>
       </div>
 
-      {/* Download Button */}
+      {/* Action Buttons */}
       <div className="card p-6">
         {error && (
           <div className="bg-red-500/10 border border-red-500/50 text-red-500 px-4 py-3 rounded-lg text-sm mb-4">
@@ -229,23 +287,56 @@ export default function AavePositionsView({ data }: { data: PositionData }) {
           </div>
         )}
 
-        <button
-          onClick={handleGeneratePNL}
-          disabled={generating}
-          className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
-        >
-          {generating ? (
-            <>
-              <Loader2 size={20} className="animate-spin" />
-              Generating Image...
-            </>
-          ) : (
-            <>
-              <Download size={20} />
-              Download PNL Card
-            </>
+        <div className="flex flex-col sm:flex-row gap-3">
+          {/* Download Button */}
+          <button
+            onClick={handleGeneratePNL}
+            disabled={generating}
+            className="flex-1 btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {generating ? (
+              <>
+                <Loader2 size={20} className="animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Download size={20} />
+                Download PNL Card
+              </>
+            )}
+          </button>
+
+          {/* Discord Share Button */}
+          {discordConfigured && (
+            <button
+              onClick={handleShareToDiscord}
+              disabled={sharing || shared}
+              className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all disabled:opacity-50 ${
+                shared
+                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                  : 'bg-[#5865F2] hover:bg-[#4752C4] text-white'
+              }`}
+            >
+              {sharing ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  Sharing...
+                </>
+              ) : shared ? (
+                <>
+                  <Check size={20} />
+                  Shared!
+                </>
+              ) : (
+                <>
+                  <MessageCircle size={20} />
+                  Share to Discord
+                </>
+              )}
+            </button>
           )}
-        </button>
+        </div>
       </div>
     </div>
   );
