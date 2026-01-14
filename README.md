@@ -201,22 +201,51 @@ aave-pnl-generator/
 
 ## Discord Bot Integration
 
-The app uses a Discord bot to share PNL cards:
+The app includes an **interactive Discord bot** that users can message directly:
 
-1. **Create Bot**: Set up a bot in the Discord Developer Portal
-2. **Configure**: Add bot token and channel ID to environment variables
-3. **Invite Bot**: Use OAuth2 URL to add the bot to your server
-4. **Share**: Click "Share to Discord" button after generating a report
+### Bot Commands
+- `!track <wallet_address>` - Track Aave portfolio and health factor
+- `!help` - Show help message
 
-The Discord message includes:
-- An embedded card with PNL summary (color-coded: green for profit, red for loss)
-- The PNL card image as an attachment
-- Wallet address and timestamp
+### Example
+```
+!track 0x561023b6e361c7c218eae4e22ff72ee0bddb1fd5
+```
+
+The bot will respond with:
+- Health Factor (color-coded: green/yellow/red)
+- Net Worth
+- Total Supplied & Borrowed
+- Individual asset positions
+
+### Running the Bot
+
+1. **Set up Discord Bot** (one-time):
+   - Go to [Discord Developer Portal](https://discord.com/developers/applications)
+   - Create application and bot
+   - **IMPORTANT**: Enable "Message Content Intent" in Bot settings
+   - Copy the bot token
+
+2. **Configure `.env.local`**:
+   ```env
+   DISCORD_BOT_TOKEN=your_bot_token_here
+   DISCORD_CHANNEL_ID=your_channel_id_here
+   ```
+
+3. **Start the bot**:
+   ```bash
+   npm run bot
+   ```
+
+4. **Invite bot to server** (use the URL printed in console)
 
 ### Required Bot Permissions
 - Send Messages
-- Attach Files
 - Embed Links
+- Read Message History
+
+### Required Bot Intents
+- Message Content Intent (enable in Developer Portal)
 
 ## Data Sources
 
