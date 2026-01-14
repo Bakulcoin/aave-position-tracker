@@ -36,19 +36,20 @@ const TOKENS: Record<string, { address: string; aTokenAddress: string; decimals:
   },
   ETH: {
     address: '0x2170Ed0880ac9A755fd29B2688956BD959F933F8',
-    aTokenAddress: '0x2E687c3eb0093408Ba8A26E3ccB0F7DA00F870C1',
+    aTokenAddress: '0x2E94171493fAbE316b6205f1585779C887771E2F',
     decimals: 18,
     coingeckoId: 'ethereum',
   },
 };
 
-// Variable debt token addresses for borrowed assets
+// Variable debt token addresses for borrowed assets (Aave V3 BNB)
+// Source: https://github.com/bgd-labs/aave-address-book
 const VARIABLE_DEBT_TOKENS: Record<string, string> = {
-  USDT: '0x5cc81b58E7bba4117B80C5374E5e6f3E47E67EFE',
-  USDC: '0xF22ba32E313eE5A6f4Db5A79e168862Bf9D1c55D',
-  WBNB: '0x2A1aCcABC1c56ACFc79eE7a09E050f9ed769b3CC',
-  BTCB: '0x6a05C73cE3E0d2C0d1Ce528fD6C9D80931EBBe8E',
-  ETH: '0x73e4E8EB656d01190D4B34c0C252E65CE8a5A4a4',
+  USDT: '0xF8bb2Be50647447Fb355e3a77b81be4db64107cd',
+  USDC: '0xcDBBEd5606d9c5C98eEedd67933991dC17F0c68d',
+  WBNB: '0x0E76414d433ddfe8004d2A7505d218874875a996',
+  BTCB: '0x7b1E82F4f542fbB25D64c5523Fe3e44aBe4F2702',
+  ETH: '0x8FDea7891b4D6dbdc746309245B316aF691A636C',
 };
 
 const ERC20_ABI = [
