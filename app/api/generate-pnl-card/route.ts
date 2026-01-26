@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     // Initialize PNL service
     const aavePnLService = new AavePnLService(process.env.BSCSCAN_API_KEY);
 
-    // Generate PNL report (data only, no image on Vercel)
+    // Generate PNL report (data only, image generation handled separately)
     const pnlCard = await aavePnLService.generatePnLReport(walletAddress);
 
     // Return data for client-side image generation

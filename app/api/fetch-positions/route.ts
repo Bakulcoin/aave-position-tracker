@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AavePnLService } from '@/lib/services/aave-pnl.service';
+import { CHAIN_IDS, ChainId } from '@/lib/config/aave';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { walletAddress } = body;
+    const { walletAddress, chainId: requestedChainId } = body;
 
     if (!walletAddress) {
       return NextResponse.json(
@@ -21,10 +22,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`Fetching Aave positions for wallet: ${walletAddress}`);
+    // Validate and set chain ID (default to BSC for backwards compatibility)
+    const chainId: ChainId = requestedChainId === CHAIN_IDS.BASE
+      ? CHAIN_IDS.BASE
+      : CHAIN_IDS.BSC;
 
-    // Initialize PNL service
-    const aavePnLService = new AavePnLService(process.env.BSCSCAN_API_KEY);
+    console.log(`Fetching Aave positions for wallet: ${walletAddress} on chain ${chainId}`);
+
+    // Initialize PNL service with chain ID
+    const aavePnLService = new AavePnLService(process.env.BSCSCAN_API_KEY, chainId);
 
     // Generate PNL report (without saving to file)
     const pnlCard = await aavePnLService.generatePnLReport(walletAddress);
@@ -33,6 +39,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       walletAddress,
+      chainId,
+      chainName: aavePnLService.getChainName(),
       positions: {
         supplied: pnlCard.position.supplied,
         borrowed: pnlCard.position.borrowed,

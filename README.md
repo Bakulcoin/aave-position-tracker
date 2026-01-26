@@ -8,10 +8,9 @@ A web application to generate beautiful PNL (Profit and Loss) reports for your A
 
 - **Frontend**: Next.js 14, React, TailwindCSS
 - **Backend**: Next.js API Routes
-- **Deployment**: Vercel
+- **Deployment**: Discord Bot
 - **Blockchain Data**: BscScan API
 - **Price Data**: CoinGecko API
-- **Sharing**: Discord Bot (discord.js)
 
 ## Features
 
@@ -87,21 +86,6 @@ npm run dev
 ```
 
 Visit [http://localhost:3000](http://localhost:3000) to see the app!
-
-## Deployment on Vercel
-
-1. **Push to GitHub**: Push your code to a GitHub repository
-
-2. **Import to Vercel**:
-   - Go to [vercel.com](https://vercel.com)
-   - Click "New Project"
-   - Import your GitHub repository
-
-3. **Configure Environment Variables**:
-   - Add all environment variables from `.env.local`
-   - Make sure to add them in the Vercel dashboard
-
-4. **Deploy**: Click "Deploy" and your app will be live!
 
 ## CLI Usage (Optional)
 
@@ -325,7 +309,6 @@ This tool is for informational purposes only. Always verify PNL calculations ind
 
 Built with:
 - [Next.js](https://nextjs.org/) - React framework
-- [Vercel](https://vercel.com/) - Deployment platform
 - [TailwindCSS](https://tailwindcss.com/) - CSS framework
 - [ethers.js](https://docs.ethers.org/) - Ethereum library
 - [discord.js](https://discord.js.org/) - Discord bot library

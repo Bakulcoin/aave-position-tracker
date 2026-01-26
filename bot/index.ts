@@ -2,54 +2,43 @@ import { Client, GatewayIntentBits, Message, EmbedBuilder, AttachmentBuilder } f
 import { ethers } from 'ethers';
 import axios from 'axios';
 import * as dotenv from 'dotenv';
+import {
+  CHAIN_IDS,
+  ChainId,
+  getChainConfig,
+  AAVE_TOKENS_BSC,
+  AAVE_TOKENS_BASE,
+  AAVE_CONTRACTS_BSC,
+  AAVE_CONTRACTS_BASE,
+  RPC_ENDPOINTS,
+} from '../lib/config/aave';
 
 dotenv.config({ path: '.env.local' });
 
-// Aave V3 Pool contract on BSC
-const AAVE_POOL_ADDRESS = '0x6807dc923806fE8Fd134338EABCA509979a7e0cB';
-
-// Token configurations
-const TOKENS: Record<string, { address: string; aTokenAddress: string; decimals: number; coingeckoId: string }> = {
-  USDT: {
-    address: '0x55d398326f99059fF775485246999027B3197955',
-    aTokenAddress: '0xa9251ca9DE909CB71783723713B21E4233fbf1B1',
-    decimals: 18,
-    coingeckoId: 'tether',
-  },
-  USDC: {
-    address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',
-    aTokenAddress: '0x00901a076785e0906d1028c7d6372d247bec7d61',
-    decimals: 18,
-    coingeckoId: 'usd-coin',
-  },
-  WBNB: {
-    address: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
-    aTokenAddress: '0x9B00a09492a626678E5A3009982191586C444Df9',
-    decimals: 18,
-    coingeckoId: 'wbnb',
-  },
-  BTCB: {
-    address: '0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c',
-    aTokenAddress: '0x56a7ddc4e848EbF43845854205ad71D5D5F72d3D',
-    decimals: 18,
-    coingeckoId: 'binance-bitcoin',
-  },
-  ETH: {
-    address: '0x2170Ed0880ac9A755fd29B2688956BD959F933F8',
-    aTokenAddress: '0x2E94171493fAbE316b6205f1585779C887771E2F',
-    decimals: 18,
-    coingeckoId: 'ethereum',
-  },
-};
-
-// Variable debt token addresses for borrowed assets (Aave V3 BNB)
-// Source: https://github.com/bgd-labs/aave-address-book
-const VARIABLE_DEBT_TOKENS: Record<string, string> = {
-  USDT: '0xF8bb2Be50647447Fb355e3a77b81be4db64107cd',
-  USDC: '0xcDBBEd5606d9c5C98eEedd67933991dC17F0c68d',
-  WBNB: '0x0E76414d433ddfe8004d2A7505d218874875a996',
-  BTCB: '0x7b1E82F4f542fbB25D64c5523Fe3e44aBe4F2702',
-  ETH: '0x8FDea7891b4D6dbdc746309245B316aF691A636C',
+// CoinGecko ID mapping for tokens
+const COINGECKO_IDS: Record<string, string> = {
+  // BSC tokens
+  USDT: 'tether',
+  USDC: 'usd-coin',
+  WBNB: 'wbnb',
+  BTCB: 'binance-bitcoin',
+  ETH: 'ethereum',
+  FDUSD: 'first-digital-usd',
+  CAKE: 'pancakeswap-token',
+  wstETH: 'wrapped-steth',
+  // Base tokens
+  WETH: 'ethereum',
+  USDbC: 'usd-coin',
+  cbETH: 'coinbase-wrapped-staked-eth',
+  weETH: 'wrapped-eeth',
+  cbBTC: 'coinbase-wrapped-btc',
+  ezETH: 'renzo-restaked-eth',
+  GHO: 'gho',
+  wrsETH: 'wrapped-rseth',
+  LBTC: 'lombard-staked-btc',
+  EURC: 'euro-coin',
+  AAVE: 'aave',
+  tBTC: 'tbtc',
 };
 
 const ERC20_ABI = [
@@ -62,25 +51,32 @@ const AAVE_POOL_ABI = [
   'function getUserAccountData(address user) view returns (uint256 totalCollateralBase, uint256 totalDebtBase, uint256 availableBorrowsBase, uint256 currentLiquidationThreshold, uint256 ltv, uint256 healthFactor)',
 ];
 
-// Multiple BSC RPC endpoints for fallback
-const RPC_ENDPOINTS = [
-  'https://bsc-dataseed1.binance.org',
-  'https://bsc-dataseed2.binance.org',
-  'https://bsc-dataseed3.binance.org',
-  'https://bsc-dataseed4.binance.org',
-  'https://bsc.publicnode.com',
-  'https://binance.llamarpc.com',
-];
+function createProvider(chainId: ChainId): ethers.JsonRpcProvider {
+  const chainConfig = getChainConfig(chainId);
+  const envRpcUrl = chainId === CHAIN_IDS.BSC
+    ? process.env.BSC_RPC_URL
+    : chainId === CHAIN_IDS.BASE
+      ? process.env.BASE_RPC_URL
+      : undefined;
 
-function createProvider(): ethers.JsonRpcProvider {
-  const rpcUrl = process.env.BSC_RPC_URL || RPC_ENDPOINTS[0];
+  const rpcUrl = envRpcUrl || chainConfig.rpcEndpoints[0];
   return new ethers.JsonRpcProvider(rpcUrl, {
-    chainId: 56,
-    name: 'bnb',
+    chainId: chainConfig.chainId,
+    name: chainConfig.name.toLowerCase().replace(' ', '-'),
   });
 }
 
-let provider = createProvider();
+function getTokensForChain(chainId: ChainId) {
+  return chainId === CHAIN_IDS.BASE ? AAVE_TOKENS_BASE : AAVE_TOKENS_BSC;
+}
+
+function getPoolAddressForChain(chainId: ChainId): string {
+  return chainId === CHAIN_IDS.BASE ? AAVE_CONTRACTS_BASE.POOL : AAVE_CONTRACTS_BSC.POOL;
+}
+
+function getRpcEndpointsForChain(chainId: ChainId): string[] {
+  return RPC_ENDPOINTS[chainId] || RPC_ENDPOINTS[CHAIN_IDS.BSC];
+}
 
 interface Position {
   symbol: string;
@@ -96,34 +92,43 @@ interface Portfolio {
   totalBorrowed: number;
   netWorth: number;
   healthFactor: number;
+  chainId: ChainId;
+  chainName: string;
 }
 
-async function getTokenPrices(): Promise<Record<string, number>> {
-  const ids = Object.values(TOKENS).map(t => t.coingeckoId).join(',');
+async function getTokenPrices(chainId: ChainId): Promise<Record<string, number>> {
+  const tokens = getTokensForChain(chainId);
+  const symbols = Object.keys(tokens);
+  const ids = [...new Set(symbols.map(s => COINGECKO_IDS[s]).filter(Boolean))].join(',');
+
   const response = await axios.get(
     `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`
   );
 
   const prices: Record<string, number> = {};
-  for (const [symbol, config] of Object.entries(TOKENS)) {
-    prices[symbol] = response.data[config.coingeckoId]?.usd || 0;
+  for (const symbol of symbols) {
+    const coingeckoId = COINGECKO_IDS[symbol];
+    prices[symbol] = coingeckoId ? (response.data[coingeckoId]?.usd || 0) : 0;
   }
   return prices;
 }
 
-async function getTokenBalance(tokenAddress: string, walletAddress: string, decimals: number): Promise<number> {
+async function getTokenBalance(tokenAddress: string, walletAddress: string, decimals: number, chainId: ChainId): Promise<number> {
+  const rpcEndpoints = getRpcEndpointsForChain(chainId);
+  const chainConfig = getChainConfig(chainId);
+
   // Try each RPC endpoint until one works
-  for (let i = 0; i < RPC_ENDPOINTS.length; i++) {
+  for (let i = 0; i < rpcEndpoints.length; i++) {
     try {
-      const rpcProvider = new ethers.JsonRpcProvider(RPC_ENDPOINTS[i], {
-        chainId: 56,
-        name: 'bnb',
+      const rpcProvider = new ethers.JsonRpcProvider(rpcEndpoints[i], {
+        chainId: chainConfig.chainId,
+        name: chainConfig.name.toLowerCase().replace(' ', '-'),
       });
       const contract = new ethers.Contract(tokenAddress, ERC20_ABI, rpcProvider);
       const balance = await contract.balanceOf(walletAddress);
       return parseFloat(ethers.formatUnits(balance, decimals));
     } catch (error) {
-      if (i === RPC_ENDPOINTS.length - 1) {
+      if (i === rpcEndpoints.length - 1) {
         console.error(`Failed to get balance for ${tokenAddress}:`, error);
         return 0;
       }
@@ -134,14 +139,18 @@ async function getTokenBalance(tokenAddress: string, walletAddress: string, deci
   return 0;
 }
 
-async function getAaveAccountData(walletAddress: string): Promise<{ healthFactor: number; totalCollateral: number; totalDebt: number }> {
-  for (let i = 0; i < RPC_ENDPOINTS.length; i++) {
+async function getAaveAccountData(walletAddress: string, chainId: ChainId): Promise<{ healthFactor: number; totalCollateral: number; totalDebt: number }> {
+  const rpcEndpoints = getRpcEndpointsForChain(chainId);
+  const chainConfig = getChainConfig(chainId);
+  const poolAddress = getPoolAddressForChain(chainId);
+
+  for (let i = 0; i < rpcEndpoints.length; i++) {
     try {
-      const rpcProvider = new ethers.JsonRpcProvider(RPC_ENDPOINTS[i], {
-        chainId: 56,
-        name: 'bnb',
+      const rpcProvider = new ethers.JsonRpcProvider(rpcEndpoints[i], {
+        chainId: chainConfig.chainId,
+        name: chainConfig.name.toLowerCase().replace(' ', '-'),
       });
-      const poolContract = new ethers.Contract(AAVE_POOL_ADDRESS, AAVE_POOL_ABI, rpcProvider);
+      const poolContract = new ethers.Contract(poolAddress, AAVE_POOL_ABI, rpcProvider);
       const accountData = await poolContract.getUserAccountData(walletAddress);
 
       // Health factor is returned with 18 decimals
@@ -152,7 +161,7 @@ async function getAaveAccountData(walletAddress: string): Promise<{ healthFactor
 
       return { healthFactor, totalCollateral, totalDebt };
     } catch (error) {
-      if (i === RPC_ENDPOINTS.length - 1) {
+      if (i === rpcEndpoints.length - 1) {
         console.error('Failed to get Aave account data:', error);
         return { healthFactor: Infinity, totalCollateral: 0, totalDebt: 0 };
       }
@@ -162,19 +171,22 @@ async function getAaveAccountData(walletAddress: string): Promise<{ healthFactor
   return { healthFactor: Infinity, totalCollateral: 0, totalDebt: 0 };
 }
 
-async function fetchPortfolio(walletAddress: string): Promise<Portfolio> {
+async function fetchPortfolio(walletAddress: string, chainId: ChainId = CHAIN_IDS.BSC): Promise<Portfolio> {
+  const tokens = getTokensForChain(chainId);
+  const chainConfig = getChainConfig(chainId);
+
   // Fetch prices and Aave account data in parallel
   const [prices, aaveData] = await Promise.all([
-    getTokenPrices(),
-    getAaveAccountData(walletAddress),
+    getTokenPrices(chainId),
+    getAaveAccountData(walletAddress, chainId),
   ]);
 
   const supplied: Position[] = [];
   const borrowed: Position[] = [];
 
   // Fetch supplied positions (aToken balances)
-  for (const [symbol, config] of Object.entries(TOKENS)) {
-    const balance = await getTokenBalance(config.aTokenAddress, walletAddress, config.decimals);
+  for (const [symbol, tokenInfo] of Object.entries(tokens)) {
+    const balance = await getTokenBalance(tokenInfo.aToken, walletAddress, tokenInfo.decimals, chainId);
     if (balance > 0.000001) {
       const price = prices[symbol] || 0;
       supplied.push({
@@ -187,9 +199,8 @@ async function fetchPortfolio(walletAddress: string): Promise<Portfolio> {
   }
 
   // Fetch borrowed positions (variable debt token balances)
-  for (const [symbol, debtTokenAddress] of Object.entries(VARIABLE_DEBT_TOKENS)) {
-    const config = TOKENS[symbol];
-    const balance = await getTokenBalance(debtTokenAddress, walletAddress, config.decimals);
+  for (const [symbol, tokenInfo] of Object.entries(tokens)) {
+    const balance = await getTokenBalance(tokenInfo.debtToken, walletAddress, tokenInfo.decimals, chainId);
     if (balance > 0.000001) {
       const price = prices[symbol] || 0;
       borrowed.push({
@@ -215,6 +226,8 @@ async function fetchPortfolio(walletAddress: string): Promise<Portfolio> {
     totalBorrowed,
     netWorth,
     healthFactor,
+    chainId,
+    chainName: chainConfig.name,
   };
 }
 
@@ -247,11 +260,11 @@ function createPortfolioEmbed(walletAddress: string, portfolio: Portfolio): Embe
   }
 
   const embed = new EmbedBuilder()
-    .setTitle('🏦 Aave V3 Portfolio - BSC')
+    .setTitle(`🏦 Aave V3 Portfolio - ${portfolio.chainName}`)
     .setDescription(`**Wallet:** \`${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}\``)
     .setColor(healthColor)
     .setTimestamp()
-    .setFooter({ text: 'Aave PNL Bot • Data from BSC' });
+    .setFooter({ text: `Aave PNL Bot • Data from ${portfolio.chainName}` });
 
   // Health Factor - Always show prominently
   const hfDisplay = (portfolio.healthFactor === Infinity || portfolio.healthFactor > 1000000)
@@ -329,7 +342,7 @@ client.once('ready', () => {
   console.log(`✅ Bot is online as ${client.user?.tag}`);
   console.log(`📌 Invite URL: https://discord.com/api/oauth2/authorize?client_id=${client.user?.id}&permissions=274877910016&scope=bot`);
   console.log(`\n📋 Commands:`);
-  console.log(`   !track <wallet_address> - Track Aave portfolio`);
+  console.log(`   !track <wallet_address> [chain] - Track Aave portfolio (chain: bsc, base)`);
   console.log(`   !help - Show help message\n`);
 });
 
@@ -352,7 +365,7 @@ client.on('messageCreate', async (message: Message) => {
           new EmbedBuilder()
             .setColor(0xff4444)
             .setTitle('❌ Invalid Command')
-            .setDescription('Please provide a valid wallet address.\n\n**Usage:**\n`!track 0x1234...abcd`\n`!track "0x1234...abcd"`')
+            .setDescription('Please provide a valid wallet address.\n\n**Usage:**\n`!track 0x1234...abcd [chain]`\n`!track 0x1234...abcd base`\n\n**Supported chains:** bsc (default), base')
         ]
       });
       return;
@@ -360,18 +373,30 @@ client.on('messageCreate', async (message: Message) => {
 
     const walletAddress = walletMatch[1];
 
+    // Check for chain parameter after the wallet address
+    const argsAfterWallet = args.slice(args.indexOf(walletAddress) + walletAddress.length).trim().toLowerCase();
+    let chainId: ChainId = CHAIN_IDS.BSC; // Default to BSC
+
+    if (argsAfterWallet.includes('base')) {
+      chainId = CHAIN_IDS.BASE;
+    } else if (argsAfterWallet.includes('bsc') || argsAfterWallet.includes('bnb')) {
+      chainId = CHAIN_IDS.BSC;
+    }
+
+    const chainConfig = getChainConfig(chainId);
+
     // Send loading message
     const loadingMsg = await message.reply({
       embeds: [
         new EmbedBuilder()
           .setColor(0x5865F2)
           .setTitle('⏳ Fetching Portfolio...')
-          .setDescription(`Loading Aave positions for \`${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}\``)
+          .setDescription(`Loading Aave positions on **${chainConfig.name}** for \`${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}\``)
       ]
     });
 
     try {
-      const portfolio = await fetchPortfolio(walletAddress);
+      const portfolio = await fetchPortfolio(walletAddress, chainId);
 
       if (portfolio.supplied.length === 0 && portfolio.borrowed.length === 0) {
         await loadingMsg.edit({
@@ -379,7 +404,7 @@ client.on('messageCreate', async (message: Message) => {
             new EmbedBuilder()
               .setColor(0xffaa00)
               .setTitle('📭 No Positions Found')
-              .setDescription(`No Aave V3 positions found for this wallet on BSC.\n\nWallet: \`${walletAddress}\``)
+              .setDescription(`No Aave V3 positions found for this wallet on ${chainConfig.name}.\n\nWallet: \`${walletAddress}\``)
           ]
         });
         return;
@@ -408,16 +433,16 @@ client.on('messageCreate', async (message: Message) => {
         new EmbedBuilder()
           .setColor(0x00d4aa)
           .setTitle('🏦 Aave PNL Bot - Help')
-          .setDescription('Track your Aave V3 positions on BSC')
+          .setDescription('Track your Aave V3 positions on multiple chains')
           .addFields(
             {
               name: '📊 Track Portfolio',
-              value: '`!track <wallet_address>`\nExample: `!track 0x1234...abcd`',
+              value: '`!track <wallet_address> [chain]`\nExamples:\n`!track 0x1234...abcd` (BSC default)\n`!track 0x1234...abcd base`\n`!track 0x1234...abcd bsc`',
               inline: false,
             },
             {
-              name: '📋 Supported Tokens',
-              value: 'USDT, USDC, WBNB, BTCB, ETH',
+              name: '🔗 Supported Chains',
+              value: '**BSC (BNB Chain)**: USDT, USDC, WBNB, BTCB, ETH, FDUSD, CAKE, wstETH\n**Base**: WETH, USDC, USDbC, cbETH, wstETH, weETH, cbBTC, ezETH, GHO, EURC, AAVE',
               inline: false,
             },
             {
@@ -426,7 +451,7 @@ client.on('messageCreate', async (message: Message) => {
               inline: false,
             }
           )
-          .setFooter({ text: 'Aave V3 on BSC' })
+          .setFooter({ text: 'Aave V3 on BSC & Base' })
       ]
     });
   }

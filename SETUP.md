@@ -115,7 +115,56 @@ Visit http://localhost:3000 to see your app!
    - Check your Discord channel for the message
    - The bot will post an embed with PNL summary and the card image
 
-## Step 7: Deploy to Vercel
+## Step 7: Deploy Discord Bot (Production)
+
+The application runs as a Discord bot. Here's how to deploy it:
+
+### Option A: Deploy on a VPS/Server
+
+1. **Set up your server** (e.g., DigitalOcean, AWS EC2, Linode):
+```bash
+# SSH into your server
+ssh user@your-server-ip
+
+# Clone the repository
+git clone <your-repo-url>
+cd aave-pnl-generator
+
+# Install Node.js 18+ if not installed
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Install dependencies
+npm install
+```
+
+2. **Configure environment variables**:
+```bash
+cp .env.example .env.local
+nano .env.local
+# Add your BSCSCAN_API_KEY, DISCORD_BOT_TOKEN, DISCORD_CHANNEL_ID
+```
+
+3. **Run with PM2 (recommended for production)**:
+```bash
+# Install PM2 globally
+npm install -g pm2
+
+# Start the Discord bot
+pm2 start npm --name "aave-pnl-bot" -- run bot
+
+# Enable auto-restart on server reboot
+pm2 startup
+pm2 save
+```
+
+4. **Check bot status**:
+```bash
+pm2 status
+pm2 logs aave-pnl-bot
+```
+
+### Option B: Deploy on Railway/Render
 
 1. **Push to GitHub**:
 ```bash
@@ -124,24 +173,17 @@ git commit -m "Initial commit"
 git push origin main
 ```
 
-2. **Import to Vercel**:
-   - Go to https://vercel.com
-   - Click "New Project"
-   - Import your GitHub repository
+2. **Import to Railway/Render**:
+   - Go to https://railway.app or https://render.com
+   - Create a new project from your GitHub repository
+   - Set the start command to `npm run bot`
 
-3. **Add Environment Variables in Vercel**:
-   - Go to Project Settings > Environment Variables
-   - Add all variables from your `.env.local`:
-     - `BSCSCAN_API_KEY`
-     - `DISCORD_BOT_TOKEN`
-     - `DISCORD_CHANNEL_ID`
-     - `NEXT_PUBLIC_APP_URL` (set to your Vercel domain)
-   - Make sure to add them for Production, Preview, and Development
+3. **Add Environment Variables**:
+   - `BSCSCAN_API_KEY`
+   - `DISCORD_BOT_TOKEN`
+   - `DISCORD_CHANNEL_ID`
 
-4. **Deploy**:
-   - Click "Deploy"
-   - Wait for deployment to complete
-   - Your app is now live!
+4. **Deploy** - The bot will start automatically!
 
 ## Troubleshooting
 

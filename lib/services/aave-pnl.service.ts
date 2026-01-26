@@ -2,7 +2,7 @@ import { PnLCard, AavePosition, TokenPosition } from '../types';
 import { BscScanService } from './bscscan.service';
 import { PriceService } from './price.service';
 import { ImageGeneratorService } from './image-generator.service';
-import { AAVE_TOKENS } from '../config/aave';
+import { AAVE_TOKENS, CHAIN_IDS, ChainId, getChainConfig, TokenMap } from '../config/aave';
 import { ethers } from 'ethers';
 
 interface TokenBalance {
@@ -15,11 +15,32 @@ export class AavePnLService {
   private bscScanService: BscScanService;
   private priceService: PriceService;
   private imageGenerator: ImageGeneratorService;
+  private chainId: ChainId;
+  private tokens: TokenMap;
 
-  constructor(bscScanApiKey?: string) {
-    this.bscScanService = new BscScanService(bscScanApiKey);
+  constructor(bscScanApiKey?: string, chainId: ChainId = CHAIN_IDS.BSC) {
+    this.chainId = chainId;
+    this.bscScanService = new BscScanService(bscScanApiKey, chainId);
     this.priceService = new PriceService();
     this.imageGenerator = new ImageGeneratorService();
+
+    // Get tokens for the selected chain
+    const chainConfig = getChainConfig(chainId);
+    this.tokens = chainConfig.tokens;
+  }
+
+  /**
+   * Get the current chain ID
+   */
+  getChainId(): ChainId {
+    return this.chainId;
+  }
+
+  /**
+   * Get chain name for display
+   */
+  getChainName(): string {
+    return getChainConfig(this.chainId).name;
   }
 
   /**
@@ -35,9 +56,9 @@ export class AavePnLService {
   async fetchATokenBalances(walletAddress: string): Promise<Map<string, TokenBalance>> {
     const balances = new Map<string, TokenBalance>();
 
-    console.log(`\n🔍 Scanning aToken (supplied) balances...`);
+    console.log(`\n🔍 Scanning aToken (supplied) balances on ${this.getChainName()}...`);
 
-    for (const [key, tokenInfo] of Object.entries(AAVE_TOKENS)) {
+    for (const [key, tokenInfo] of Object.entries(this.tokens)) {
       try {
         const rawBalance = await this.bscScanService.getTokenBalance(walletAddress, tokenInfo.aToken);
 
@@ -71,9 +92,9 @@ export class AavePnLService {
   async fetchDebtTokenBalances(walletAddress: string): Promise<Map<string, TokenBalance>> {
     const balances = new Map<string, TokenBalance>();
 
-    console.log(`\n🔍 Scanning debtToken (borrowed) balances...`);
+    console.log(`\n🔍 Scanning debtToken (borrowed) balances on ${this.getChainName()}...`);
 
-    for (const [key, tokenInfo] of Object.entries(AAVE_TOKENS)) {
+    for (const [key, tokenInfo] of Object.entries(this.tokens)) {
       try {
         const rawBalance = await this.bscScanService.getTokenBalance(walletAddress, tokenInfo.debtToken);
 
@@ -110,7 +131,7 @@ export class AavePnLService {
    * 5. Generate portfolio card
    */
   async generatePnLReport(walletAddress: string, outputPath?: string): Promise<PnLCard> {
-    console.log(`\n🔍 Fetching Aave positions for wallet: ${walletAddress}`);
+    console.log(`\n🔍 Fetching Aave positions on ${this.getChainName()} for wallet: ${walletAddress}`);
 
     // Scan wallet for balances
     const aTokenBalances = await this.fetchATokenBalances(walletAddress);
@@ -128,7 +149,7 @@ export class AavePnLService {
     let totalSupplied = 0;
 
     for (const [symbol, tokenData] of aTokenBalances) {
-      const tokenInfo = AAVE_TOKENS[symbol as keyof typeof AAVE_TOKENS];
+      const tokenInfo = this.tokens[symbol as keyof typeof this.tokens];
       const currentPrice = await this.priceService.getCurrentPrice(symbol);
       const currentValue = tokenData.balance * currentPrice;
 
@@ -152,7 +173,7 @@ export class AavePnLService {
     let totalBorrowed = 0;
 
     for (const [symbol, tokenData] of debtTokenBalances) {
-      const tokenInfo = AAVE_TOKENS[symbol as keyof typeof AAVE_TOKENS];
+      const tokenInfo = this.tokens[symbol as keyof typeof this.tokens];
       const currentPrice = await this.priceService.getCurrentPrice(symbol);
       const currentValue = tokenData.balance * currentPrice;
 

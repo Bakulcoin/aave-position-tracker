@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 import { AaveTransaction } from '../types';
+import { CHAIN_IDS, ChainId, getChainConfig } from '../config/aave';
 
 export interface TokenBalance {
   tokenAddress: string;
@@ -15,19 +16,62 @@ const ERC20_ABI = [
   'function symbol() view returns (string)',
 ];
 
+// Explorer API URLs by chain
+const EXPLORER_API_URLS: Record<number, string> = {
+  [CHAIN_IDS.BSC]: 'https://api.bscscan.com/api',
+  [CHAIN_IDS.BASE]: 'https://api.basescan.org/api',
+};
+
+// Trace API URLs by chain (for transaction history)
+const TRACE_API_URLS: Record<number, string> = {
+  [CHAIN_IDS.BSC]: 'https://bsc-mainnet.nodereal.io/v1',
+  [CHAIN_IDS.BASE]: '', // Base doesn't have equivalent trace API
+};
+
 export class BscScanService {
   private provider: ethers.JsonRpcProvider;
-  private bscTraceUrl = 'https://bsc-mainnet.nodereal.io/v1';
-  private nodeRealApiKey: string;
+  private explorerApiUrl: string;
+  private traceApiUrl: string;
+  private apiKey: string;
+  private chainId: ChainId;
 
-  constructor(apiKey?: string) {
-    // Use public BSC RPC endpoint (free, no API key required)
-    // Alternative endpoints:
-    // - https://bsc-dataseed.binance.org
-    // - https://bsc-dataseed1.defibit.io
-    // - https://bsc-dataseed1.ninicoin.io
-    this.provider = new ethers.JsonRpcProvider('https://bsc-dataseed.binance.org');
-    this.nodeRealApiKey = apiKey || process.env.BSCSCAN_API_KEY || '';
+  constructor(apiKey?: string, chainId: ChainId = CHAIN_IDS.BSC) {
+    this.chainId = chainId;
+    const chainConfig = getChainConfig(chainId);
+
+    // Use environment variable RPC URL if available, otherwise use first endpoint from config
+    const envRpcUrl = chainId === CHAIN_IDS.BSC
+      ? process.env.BSC_RPC_URL
+      : chainId === CHAIN_IDS.BASE
+        ? process.env.BASE_RPC_URL
+        : undefined;
+
+    const rpcUrl = envRpcUrl || chainConfig.rpcEndpoints[0];
+
+    this.provider = new ethers.JsonRpcProvider(rpcUrl, {
+      chainId: chainConfig.chainId,
+      name: chainConfig.name.toLowerCase().replace(' ', '-'),
+    });
+
+    // Set explorer API URL and API key based on chain
+    this.explorerApiUrl = EXPLORER_API_URLS[chainId] || EXPLORER_API_URLS[CHAIN_IDS.BSC];
+    this.traceApiUrl = TRACE_API_URLS[chainId] || '';
+
+    // Get API key from parameter or environment variable based on chain
+    if (apiKey) {
+      this.apiKey = apiKey;
+    } else if (chainId === CHAIN_IDS.BASE) {
+      this.apiKey = process.env.BASESCAN_API_KEY || '';
+    } else {
+      this.apiKey = process.env.BSCSCAN_API_KEY || '';
+    }
+  }
+
+  /**
+   * Get the current chain ID
+   */
+  getChainId(): ChainId {
+    return this.chainId;
   }
 
   /**
@@ -46,27 +90,41 @@ export class BscScanService {
 
   /**
    * Fetch all transactions for a wallet address
-   * Note: This requires an indexer service, using NodeReal/BSCTrace API
+   * Uses explorer API (BscScan/BaseScan) or trace API depending on chain
    */
   async getTransactions(address: string, startBlock = 0): Promise<AaveTransaction[]> {
     try {
-      // Use NodeReal's BSCTrace API (free tier available)
-      const response = await fetch(`${this.bscTraceUrl}/${this.nodeRealApiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'eth_getTransactionsByAddress',
-          params: [address, startBlock, 'latest', 'asc', 1000],
-        }),
-      });
+      // Try using the explorer API first (works for both BSC and Base)
+      if (this.apiKey) {
+        const url = `${this.explorerApiUrl}?module=account&action=txlist&address=${address}&startblock=${startBlock}&endblock=99999999&sort=asc&apikey=${this.apiKey}`;
+        const response = await fetch(url);
+        const data = await response.json();
 
-      const data = await response.json();
-      if (data.result) {
-        return data.result;
+        if (data.status === '1' && data.result) {
+          return data.result;
+        }
       }
-      console.warn('BSCTrace API returned no transactions:', data);
+
+      // Fallback to trace API for BSC if available
+      if (this.traceApiUrl && this.apiKey) {
+        const response = await fetch(`${this.traceApiUrl}/${this.apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'eth_getTransactionsByAddress',
+            params: [address, startBlock, 'latest', 'asc', 1000],
+          }),
+        });
+
+        const data = await response.json();
+        if (data.result) {
+          return data.result;
+        }
+      }
+
+      console.warn('Explorer API returned no transactions');
       return [];
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -76,26 +134,43 @@ export class BscScanService {
 
   /**
    * Fetch internal transactions (for tracking token transfers)
+   * Uses explorer API (BscScan/BaseScan)
    */
   async getInternalTransactions(address: string): Promise<any[]> {
     try {
-      const response = await fetch(`${this.bscTraceUrl}/${this.nodeRealApiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'trace_filter',
-          params: [{
-            fromBlock: 'earliest',
-            toBlock: 'latest',
-            toAddress: [address],
-          }],
-        }),
-      });
+      // Use explorer API for internal transactions
+      if (this.apiKey) {
+        const url = `${this.explorerApiUrl}?module=account&action=txlistinternal&address=${address}&startblock=0&endblock=99999999&sort=asc&apikey=${this.apiKey}`;
+        const response = await fetch(url);
+        const data = await response.json();
 
-      const data = await response.json();
-      return data.result || [];
+        if (data.status === '1' && data.result) {
+          return data.result;
+        }
+      }
+
+      // Fallback to trace API for BSC if available
+      if (this.traceApiUrl && this.apiKey) {
+        const response = await fetch(`${this.traceApiUrl}/${this.apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'trace_filter',
+            params: [{
+              fromBlock: 'earliest',
+              toBlock: 'latest',
+              toAddress: [address],
+            }],
+          }),
+        });
+
+        const data = await response.json();
+        return data.result || [];
+      }
+
+      return [];
     } catch (error) {
       console.error('Error fetching internal transactions:', error);
       return [];
@@ -103,13 +178,27 @@ export class BscScanService {
   }
 
   /**
-   * Fetch ERC20 token transfer events using getLogs RPC call
-   * Transfer event signature: Transfer(address indexed from, address indexed to, uint256 value)
-   *
-   * Note: Public BSC RPC has rate limits, so we query in smaller block ranges
+   * Fetch ERC20 token transfer events
+   * Uses explorer API (BscScan/BaseScan) when available, falls back to RPC
    */
   async getTokenTransfers(address: string, contractAddress?: string): Promise<any[]> {
     try {
+      // Try explorer API first (more reliable and faster)
+      if (this.apiKey) {
+        let url = `${this.explorerApiUrl}?module=account&action=tokentx&address=${address}&startblock=0&endblock=99999999&sort=asc&apikey=${this.apiKey}`;
+        if (contractAddress) {
+          url += `&contractaddress=${contractAddress}`;
+        }
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.status === '1' && data.result) {
+          return data.result;
+        }
+      }
+
+      // Fallback to RPC getLogs if no API key
       // Transfer event topic
       const transferTopic = ethers.id('Transfer(address,address,uint256)');
 
